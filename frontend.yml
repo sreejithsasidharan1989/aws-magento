@@ -1,0 +1,172 @@
+---
+
+ - name: "Deploy Frontend server data"
+   hosts: localhost
+   become: no
+   vars:
+           - region: "ap-south-1"
+   vars_files:
+           - aws_creds.yml
+  
+   tasks:
+           - name: "Fetch instance details"
+             amazon.aws.ec2_instance_info:
+                     access_key: "{{ access_key }}"
+                     secret_key: "{{ secret_key }}"
+                     region: "{{ region }}"
+                     filters:
+                             "tag:Name": "Frontend-Server"
+                             instance-state-name: [ "running" ]
+             register: aws_instances
+
+           - name: "Generate Dynamic Inventory"
+             add_host:
+                     groups: "frontend-server"
+                     hostname: "{{ item.public_ip_address }}"
+                     ansible_ssh_user: "ec2-user"
+                     ansible_ssh_port: "22"
+                     ansible_ssh_private_key_file: "mykey.pem"
+                     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+             with_items: "{{ aws_instances.instances }}"
+
+ - name: "Prepare Frontend Server"
+   hosts: frontend-server
+   become: yes
+   gather_facts: false
+   vars_files:
+           - backend_vars.yml
+           - frontend_vars.yml
+
+   tasks:
+           - name: "Install Apache"
+             yum:
+                     name: httpd
+                     state: present
+
+           - name: "Install git"
+             yum:
+                     name: git
+                     state: present
+
+           - name: "Install Remi Repo"
+             yum:
+                     name: "{{ packages }}"
+                     state: present
+
+           - name: "Install PHP"
+             ignore_errors: true
+             yum:
+                     enablerepo: "remi,remi-php81"
+                     state: latest
+
+           - name: "Package Installation"
+             yum:
+                     name: "{{ php_packages }}"
+                     state: present
+
+           - name: "Build Apache httpd.conf from template"
+             template:
+                     src: "./httpd.conf.j2"
+                     dest: "/etc/httpd/httpd.conf"
+
+           - name: "Build Apache Virtualhost from template"
+             template:
+
+                     src: "./virtualhost.conf.j2"
+                     dest: "/etc/httpd/conf.d/{{ httpd_domain }}.conf"
+                     owner: "{{ httpd_owner }}"
+                     group: "{{ httpd_group }}"
+
+           - name: "Create apache docroot for {{ httpd_domain }}"
+             file:
+                     path: "/var/www/html/{{ httpd_domain }}"
+                     state: directory
+                     owner: "{{ httpd_owner }}"
+                     group: "{{ httpd_group }}"
+
+           - name: "Copy www.conf.j2"
+             template:
+                     src: "./www.conf.j2"
+                     dest: "/etc/opt/remi/php81/php-fpm.d/www.conf"
+                     owner: "root"
+                     group: "root"
+
+           - name: "Create php-fpm socket path"
+             file:
+                     path: "/run/php81/php-fpm/"
+                     state: directory
+
+           - name: "Start and enable php81-fpm service"
+             service:
+                     name: "php81-php-fpm"
+                     state: restarted
+                     enabled: true
+
+           - name: "Create symlink of php81 in /usr/local/bin/"
+             file:
+                     src: "/usr/bin/php81"
+                     dest: "/usr/local/bin/php"
+                     path: "/usr/local/bin/"
+                     state: link
+
+           - name: "Create temp directory in /tmp"
+             file:
+                     path: "/tmp/magento"
+                     state: directory
+
+           - name: "Clone Magento GitRepo to temp directory"
+             git:
+                     repo: "https://github.com/magento/magento2.git"
+                     dest: "/tmp/magento"
+                     clone: true
+
+           - name: "Copy contents of /tmp/magento/magento to /var/www/html/{{ httpd_domain }}"
+             copy:
+
+                     src: "/tmp/magento/"
+                     dest: "/var/www/html/{{ httpd_domain }}"
+                     owner: "{{ httpd_owner }}"
+                     group: "{{ httpd_group }}"
+                     remote_src: true
+
+           - name: "Install Composer"
+             get_url:
+                     url: "{{ composer_url }}"
+                     dest: "/tmp/"
+                     mode: "540"
+
+           - name: "Copy composer.phar to {{ composer_path }}"
+             copy:
+                     src: "/tmp/composer.phar"
+                     dest: "{{ composer_path }}/composer"
+                     owner: "ec2-user"
+                     group: "ec2-user"
+                     mode: "u=rx,g=rx"
+                     remote_src: true
+
+           - name: "Magento Installation"
+             shell: "/usr/local/bin/php {{ composer_path }}/composer update"
+             args:
+                     chdir: "/var/www/html/{{ httpd_domain }}/"
+
+           - name: "Run Magento setup:install command"
+             shell:  "/usr/local/bin/php bin/magento setup:install --base-url='http://{{ httpd_domain }}/' --db-host={{ mysql_host }} 
+                     --db-name={{ mysql_db }} --db-user={{ mysql_user }} --db-password={{ mysql_pass }} 
+                     --admin-firstname={{ admin_fname }} --admin-lastname={{ admin_lname }} --admin-email={{ admin_email }} 
+                     --admin-user={{ admin_user }} --admin-password={{ admin_pass }} --language=en_US --currency=USD 
+                     --timezone=America/Chicago --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host={{ es_host }} --elasticsearch-port {{ es_port }}"
+             args:
+                     chdir: "/var/www/html/{{ httpd_domain }}/"
+
+           - name: "Reset file & directory ownership in /var/www/html/{{ httpd_domain }}/"
+             file:
+                     dest: "/var/www/html/{{ httpd_domain }}"
+                     owner: "{{ httpd_owner }}"
+                     group: "{{ httpd_group }}"
+
+           - name: "Restart Apache"
+             service:
+                     name: httpd
+                     state: restarted
+                     enabled: true

@@ -1,0 +1,7 @@
+---
+mysql_root_passwd: "root123"
+mysql_db: "magento2"
+mysql_user: "magento2"
+mysql_pass: "Magento_admin123"
+mysql_host: "db.backtracker.local"
+

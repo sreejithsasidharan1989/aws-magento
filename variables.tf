@@ -10,14 +10,6 @@ variable "region" {
   default     = "ap-south-1"
   description = "Project Region"
 }
-variable "access-key" {
-  default     = "AKIAYSCSUUJBUCZVSMWK"
-  description = "IAM user access-key"
-}
-variable "secret-key" {
-  default     = "Qj3bj+yTeUNChi7An2IcPPdg1w5jELYsbexj4Wq4"
-  description = "IAM user access-secret-key"
-}
 variable "ami_id" {
   default     = "ami-01a4f99c4ac11b03c"
   description = "ap-south-1 AMI_ID"
@@ -44,7 +36,7 @@ variable "private-domain" {
 }
 variable "public-domain" {
   default     = "backtracker.tech"
-  description = "WordPress application Hostname"
+  description = "Magento application Hostname"
 }
 
 

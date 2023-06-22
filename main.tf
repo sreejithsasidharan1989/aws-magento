@@ -134,30 +134,34 @@ resource "aws_security_group" "docker-sg" {
   }
 }
 resource "aws_instance" "frontend-server" {
-  ami                         = var.ami_id
-  instance_type               = var.instance-type
-  key_name                    = aws_key_pair.mage_key.key_name
-  vpc_security_group_ids      = [aws_security_group.frontend-sg.id]
-  subnet_id                   = module.vpc.public_subnets.0
-  user_data_replace_on_change = true
+  ami                    = var.ami_id
+  instance_type          = var.instance-type
+  key_name               = aws_key_pair.mage_key.key_name
+  vpc_security_group_ids = [aws_security_group.frontend-sg.id]
+  subnet_id              = module.vpc.public_subnets.0
   tags = {
     Name        = "Frontend-Server"
     Project     = "${local.common_tags.project}"
     Environment = "${local.common_tags.environment}"
   }
   depends_on = [aws_instance.backend, aws_instance.docker]
+  provisioner "local-exec" {
+    command = "ansible frontend.yml"
+  }
 }
 resource "aws_instance" "backend" {
-  ami                         = var.ami_id
-  key_name                    = aws_key_pair.mage_key.key_name
-  instance_type               = var.instance-type
-  vpc_security_group_ids      = [aws_security_group.backend-sg.id]
-  subnet_id                   = module.vpc.public_subnets[1]
-  user_data_replace_on_change = true
+  ami                    = var.ami_id
+  key_name               = aws_key_pair.mage_key.key_name
+  instance_type          = var.instance-type
+  vpc_security_group_ids = [aws_security_group.backend-sg.id]
+  subnet_id              = module.vpc.public_subnets[1]
   tags = {
     Name        = "Backend-server"
     Project     = "${local.common_tags.project}"
     Environment = "${local.common_tags.environment}"
+  }
+  provisioner "local-exec" {
+    command = "ansible backend.yml"
   }
 }
 resource "aws_instance" "docker" {
@@ -172,4 +176,7 @@ resource "aws_instance" "docker" {
     Environment = "${local.common_tags.environment}"
   }
   depends_on = [aws_instance.backend]
+  provisioner "local-exec" {
+    command = "ansible docker.yml"
+  }
 }

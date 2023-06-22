@@ -1,0 +1,19 @@
+<virtualhost *:{{ httpd_port }}>
+ 
+  servername {{ httpd_domain }} 
+  documentroot /var/www/html/{{ httpd_domain }} 
+  directoryindex index.php index.html
+ 
+  <directory "/var/www/html/{{ httpd_domain }}">
+    allowoverride all
+  </directory>
+  
+  <Proxy "unix:{{ php_sock_path }}|fcgi://php-fpm">
+    ProxySet disablereuse=on
+  </Proxy>
+
+  <FilesMatch \.php$>
+    SetHandler proxy:fcgi://php-fpm
+  </FilesMatch> 
+
+</virtualhost>
