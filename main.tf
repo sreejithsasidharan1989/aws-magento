@@ -144,9 +144,9 @@ resource "aws_instance" "frontend-server" {
     Project     = "${local.common_tags.project}"
     Environment = "${local.common_tags.environment}"
   }
-  depends_on = [aws_instance.backend, aws_instance.docker]
+  depends_on = [aws_instance.backend, aws_instance.docker, aws_route53_record.docker-server, aws_route53_record.backend-server]
   provisioner "local-exec" {
-    command = "ansible frontend.yml"
+    command = "ansible-playbook frontend.yml"
   }
 }
 resource "aws_instance" "backend" {
@@ -161,7 +161,7 @@ resource "aws_instance" "backend" {
     Environment = "${local.common_tags.environment}"
   }
   provisioner "local-exec" {
-    command = "ansible backend.yml"
+    command = "ansible-playbook backend.yml"
   }
 }
 resource "aws_instance" "docker" {
@@ -177,6 +177,40 @@ resource "aws_instance" "docker" {
   }
   depends_on = [aws_instance.backend]
   provisioner "local-exec" {
-    command = "ansible docker.yml"
+    command = "ansible-playbook docker.yml"
   }
 }
+
+data "aws_route53_zone" "public" {
+  name         = "backtracker.tech"
+  private_zone = false
+}
+data "aws_route53_zone" "private" {
+  name         = "backtracker.local"
+  private_zone = true
+}
+
+resource "aws_route53_record" "frontend-servers" {
+  zone_id = data.aws_route53_zone.public.id
+  name    = var.frontend
+  type    = "A"
+  ttl     = "300"
+  records = [aws_instance.frontend-server.private_ip]
+}
+
+resource "aws_route53_record" "backend-server" {
+  zone_id = data.aws_route53_zone.private.id
+  name    = var.backend
+  type    = "A"
+  ttl     = "300"
+  records = [aws_instance.backend.private_ip]
+}
+
+resource "aws_route53_record" "docker-server" {
+  zone_id = data.aws_route53_zone.private.id
+  name    = var.docker
+  type    = "A"
+  ttl     = "300"
+  records = [aws_instance.docker.private_ip]
+}
+

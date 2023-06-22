@@ -7,6 +7,7 @@
            - region: "ap-south-1"
    vars_files:
            - aws_creds.yml
+           - backend_vars.yml
 
    tasks:
            - name: "Fetch instance details"
@@ -15,6 +16,10 @@
                      aws_secret_key: "{{ secret_key }}"
              register: aws_instances
 
+           - name: "Print instance details"
+             debug:
+                     msg: "Server Details {{ aws_instances }}"
+
            - name: "Generate Dynamic Inventory"
              add_host:
                      groups: "backend-server"
@@ -22,7 +27,7 @@
                      ansible_ssh_user: "ec2-user"
                      ansible_ssh_port: "22"
                      ansible_ssh_private_key_file: "mykey.pem"
-                     ansible_ssh_coomon_args: "-o StrictHostKeyChecking=no"
+                     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
              with_items: "{{ aws_instances.instances }}"
 
              
@@ -41,11 +46,13 @@
 
            - name: "Download Mariadb repo"
              get_url:
-                     url: "curl -LsS -O https://downloads.mariadb.com/MariaDB/mariadb_repo_setup"
+                     url: "https://downloads.mariadb.com/MariaDB/mariadb_repo_setup"
                      dest: "/tmp/"
 
            - name: "Install Repo"
              shell: "sudo bash mariadb_repo_setup --os-type=rhel  --os-version=7 --mariadb-server-version=10.6"
+             args:
+                     chdir: "/tmp"
 
            - name: "Update yum cache"
              yum:
@@ -76,6 +83,7 @@
 
            - name: "Remove Anonymous users"
              mysql_user:
+                     login_unix_socket: /var/lib/mysql/mysql.sock
                      login_user: "root"
                      login_password: "{{ mysql_root_passwd }}"
                      name: ""
@@ -85,12 +93,15 @@
 
            - name: "Create Mariadb Database {{ mysql_db }}"
              mysql_db:
+                     login_unix_socket: /var/lib/mysql/mysql.sock
                      login_user: "root"
                      login_password: "{{ mysql_root_passwd }}"
                      name: "{{ mysql_db }}"
                      state: present
+
            - name: "Create Mariadb User {{ mysql_user }}"
              mysql_user:
+                     login_unix_socket: /var/lib/mysql/mysql.sock
                      login_user: "root"
                      login_password: "{{ mysql_root_passwd }}"
                      name: "{{ mysql_user }}"

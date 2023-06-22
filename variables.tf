@@ -38,5 +38,15 @@ variable "public-domain" {
   default     = "backtracker.tech"
   description = "Magento application Hostname"
 }
-
-
+variable "backend" {
+  default = "db.backtracker.local"
+  description = "Database server hostname"
+}
+variable "docker" {
+  default = "docker.backtracker.local"
+  description = "Docker server hostname"
+}
+variable "frontend" {
+  default = "magento.backtracker.tech"
+  description = "Magento application hostname"
+}
