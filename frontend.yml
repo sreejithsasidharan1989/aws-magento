@@ -150,20 +150,35 @@
              args:
                      chdir: "/var/www/html/{{ httpd_domain }}/"
 
+           - name: "Downgrade Elasticsearch to version 7"
+             shell: "/usr/local/bin/php {{ composer_path }}/composer require elasticsearch/elasticsearch ~7"
+             args:
+                     chdir: "/var/www/html/{{ httpd_domain }}/"
+
            - name: "Run Magento setup:install command"
-             shell:  "/usr/local/bin/php bin/magento setup:install --base-url='http://{{ httpd_domain }}/' --db-host={{ mysql_host }} 
+             shell:  "/usr/local/bin/php -dmemory_limit=-1 bin/magento setup:install --base-url='http://{{ httpd_domain }}/' --db-host={{ mysql_host }} 
                      --db-name={{ mysql_db }} --db-user={{ mysql_user }} --db-password={{ mysql_pass }} 
                      --admin-firstname={{ admin_fname }} --admin-lastname={{ admin_lname }} --admin-email={{ admin_email }} 
                      --admin-user={{ admin_user }} --admin-password={{ admin_pass }} --language=en_US --currency=USD 
-                     --timezone=America/Chicago --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host={{ es_host }} --elasticsearch-port {{ es_port }}"
+                     --timezone=America/Chicago --use-rewrites=1 --search-engine=elasticsearch7 --elasticsearch-host={{ es_host }} --elasticsearch-port {{ es_port }} --cleanup-database"
              args:
                      chdir: "/var/www/html/{{ httpd_domain }}/"
 
            - name: "Reset file & directory ownership in /var/www/html/{{ httpd_domain }}/"
              file:
                      dest: "/var/www/html/{{ httpd_domain }}"
+                     recurse: true
                      owner: "{{ httpd_owner }}"
                      group: "{{ httpd_group }}"
+
+           - name: "Set ACL for ec2-user on /var/www/html/{{ httpd_domain }}"
+             ansible.posix.acl:
+                     path: "/var/www/html/{{ httpd_domain }}"
+                     entity: "ec2-user"
+                     permissions: "rwx"
+                     etype: "user"
+                     state: present
+                     recursive: "true"
 
            - name: "Restart Apache"
              service:

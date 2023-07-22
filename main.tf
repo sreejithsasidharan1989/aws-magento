@@ -3,7 +3,18 @@ module "vpc" {
   project      = var.project
   environment  = var.environment
   vpc_cidr     = var.vpc_cidr
-  enable_natgw = var.switch_nat
+  enable_natgw = var.nat_switch
+}
+
+module "alb" {
+  source      = "github.com/sreejithsasidharan1989/aws-alb-module"
+  project     = var.project
+  environment = var.environment
+  alb_switch  = var.alb_switch
+  subnet_ids  = module.vpc.public_subnets
+  vpc_id      = module.vpc.vpc_id
+  cert_switch = var.cert_switch
+  cert_arn    = var.cert_arn
 }
 resource "tls_private_key" "key_file" {
   algorithm = "RSA"
@@ -106,7 +117,7 @@ resource "aws_security_group" "docker-sg" {
     from_port       = 9200
     to_port         = 9200
     protocol        = "tcp"
-    security_groups = [aws_security_group.backend-sg.id]
+    security_groups = [aws_security_group.frontend-sg.id]
   }
   ingress {
     from_port        = 22
@@ -180,26 +191,36 @@ resource "aws_instance" "docker" {
     command = "ansible-playbook docker.yml"
   }
 }
-
-data "aws_route53_zone" "public" {
-  name         = "backtracker.tech"
-  private_zone = false
+resource "aws_lb_target_group_attachment" "frontend_tg" {
+  target_group_arn = module.alb.tg_arn
+  target_id        = aws_instance.frontend-server.id
+  port             = 80
 }
-data "aws_route53_zone" "private" {
-  name         = "backtracker.local"
-  private_zone = true
+resource "aws_route53_zone" "private" {
+  name = "backtracker.local"
+  vpc {
+    vpc_id = module.vpc.vpc_id
+  }
 }
 
 resource "aws_route53_record" "frontend-servers" {
+  count   = var.alb_switch ? 0 : 1
   zone_id = data.aws_route53_zone.public.id
   name    = var.frontend
   type    = "A"
   ttl     = "300"
-  records = [aws_instance.frontend-server.private_ip]
+  records = [aws_instance.frontend-server.public_ip]
 }
-
+resource "aws_route53_record" "alb-cname" {
+  count   = var.alb_switch ? 1 : 0
+  zone_id = data.aws_route53_zone.public.id
+  name    = var.frontend
+  type    = "CNAME"
+  ttl     = "300"
+  records = [module.alb.dns_name]
+}
 resource "aws_route53_record" "backend-server" {
-  zone_id = data.aws_route53_zone.private.id
+  zone_id = resource.aws_route53_zone.private.id
   name    = var.backend
   type    = "A"
   ttl     = "300"
@@ -207,10 +228,9 @@ resource "aws_route53_record" "backend-server" {
 }
 
 resource "aws_route53_record" "docker-server" {
-  zone_id = data.aws_route53_zone.private.id
+  zone_id = resource.aws_route53_zone.private.id
   name    = var.docker
   type    = "A"
   ttl     = "300"
   records = [aws_instance.docker.private_ip]
 }
-

@@ -18,7 +18,7 @@ variable "vpc_cidr" {
   default     = "172.16.0.0/16"
   description = "VPC CIDR"
 }
-variable "switch_nat" {}
+variable "nat_switch" {}
 locals {
   common_tags = {
     "project"     = var.project
@@ -39,14 +39,17 @@ variable "public-domain" {
   description = "Magento application Hostname"
 }
 variable "backend" {
-  default = "db.backtracker.local"
+  default     = "db.backtracker.local"
   description = "Database server hostname"
 }
 variable "docker" {
-  default = "docker.backtracker.local"
+  default     = "elastic.backtracker.local"
   description = "Docker server hostname"
 }
 variable "frontend" {
-  default = "magento.backtracker.tech"
+  default     = "magento.backtracker.tech"
   description = "Magento application hostname"
 }
+variable "alb_switch" {}
+variable "cert_arn" {}
+variable "cert_switch" {}
