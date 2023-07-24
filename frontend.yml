@@ -156,7 +156,7 @@
                      chdir: "/var/www/html/{{ httpd_domain }}/"
 
            - name: "Run Magento setup:install command"
-             shell:  "/usr/local/bin/php -dmemory_limit=-1 bin/magento setup:install --base-url='http://{{ httpd_domain }}/' --db-host={{ mysql_host }} 
+             shell:  "/usr/local/bin/php -dmemory_limit=-1 bin/magento setup:install --base-url='https://{{ httpd_domain }}/' --db-host={{ mysql_host }} 
                      --db-name={{ mysql_db }} --db-user={{ mysql_user }} --db-password={{ mysql_pass }} 
                      --admin-firstname={{ admin_fname }} --admin-lastname={{ admin_lname }} --admin-email={{ admin_email }} 
                      --admin-user={{ admin_user }} --admin-password={{ admin_pass }} --language=en_US --currency=USD 
