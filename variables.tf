@@ -1,21 +1,21 @@
 variable "project" {
-  default     = "magento"
+  default     = "$project"
   description = "Application"
 }
 variable "environment" {
-  default     = "development"
+  default     = "$environment"
   description = "Environment"
 }
 variable "region" {
-  default     = "ap-south-1"
+  default     = "$region"
   description = "Project Region"
 }
 variable "ami_id" {
-  default     = "ami-01a4f99c4ac11b03c"
-  description = "ap-south-1 AMI_ID"
+  default     = "$ami_id"
+  description = "$region AMI_ID"
 }
 variable "vpc_cidr" {
-  default     = "172.16.0.0/16"
+  default     = "$vpc_cidr"
   description = "VPC CIDR"
 }
 variable "nat_switch" {}
@@ -27,27 +27,27 @@ locals {
   description = "Local Tags"
 }
 variable "instance-type" {
-  default     = "t2.micro"
+  default     = "$instance_type"
   description = "Instance Type"
 }
 variable "private-domain" {
-  default     = "backtracker.local"
+  default     = "$public_zone"
   description = "DB_HOST Value"
 }
 variable "public-domain" {
-  default     = "backtracker.tech"
+  default     = "$private_zone"
   description = "Magento application Hostname"
 }
 variable "backend" {
-  default     = "db.backtracker.local"
+  default     = "$db_server_hostname"
   description = "Database server hostname"
 }
 variable "docker" {
-  default     = "elastic.backtracker.local"
+  default     = "$docker_server_hostname"
   description = "Docker server hostname"
 }
 variable "frontend" {
-  default     = "magento.backtracker.tech"
+  default     = "$website_name"
   description = "Magento application hostname"
 }
 variable "alb_switch" {}
