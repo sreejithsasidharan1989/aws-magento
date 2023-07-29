@@ -25,7 +25,22 @@ function __aws_cli() {
 		echo "============= AWS CLI Installation Complete! =============="
 	fi
 }
-
+function __ansible_vault() {
+	touch aws_creds.yml
+	echo "---" >> aws_creds.yml
+	echo "Enter your AWS Access Key & Secret Key when prompted"
+	sleep 2
+	read -rs -p "Enter your AWS Access Key:" access
+	echo ""
+	read -rs -p "Enter your AWS Secret Key:" secret
+	echo ""
+	echo "access_key: \"${access}\"" >> aws_creds.yml
+	echo "secret_key: \"${secret}\"" >> aws_creds.yml
+	echo "============= Encrypting aws_creds.yml using Ansible vault ============="
+	echo "Keep a password ready for encryption"
+	sleep 3
+	ansible-vault encrypt aws_creds.yml
+}
 function __install() {
         VERSION=$(cat /etc/os-release | grep -oP '^NAME\=.+' | tr -d '""' | cut -d '=' -f 2)
         case $VERSION in
@@ -63,7 +78,7 @@ function deb_install {
         if __verify "terraform"
         then
                 echo "========= Installing terraform ========="
-                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg &> /dev/null
+                wget -O - https://apt.releases.hashicorp.com/gpg -nv | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg &> /dev/null
                 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
                 sudo apt -qq update && sudo apt -qq install terraform -y 
                 if __verify "terraform"
@@ -73,9 +88,10 @@ function deb_install {
         fi
         if __verify "ansible"
         then
-                echo "Installing Ansible"
+                echo "========= Installing Ansible ========="
                 sudo apt update
-                sudo apt install ansible -y
+                sudo apt -qq install ansible -y
+		__ansible_vault
                 if __verify "ansible"
                 then
                         echo "========= Ansible Insallation Complete! ==========="
@@ -99,8 +115,8 @@ function rhel_install {
         if __verify "ansible"
         then
 		sudo yum install python3 python3-pip -y -q && echo "======= Python and PIP installation Completed! ========"
-                pip install ansible -q --log /tmp/pip.log
-
+                pip install ansible --quiet --log /tmp/pip.log
+		__ansible_vault
                 if __verify "ansible"
                 then
                         echo "======== Ansible Insallation Completed! ======="
@@ -129,24 +145,26 @@ function terraform_variable_overload() {
 	echo "!! Make sure you've access-key & secret-key for an IAM user with Ec2FullAccess before answering Yes to next question !!"
 	sleep 2
 	read -p "Default region is ap-south-1. Would you like to use a different Region [Yes/No]?:" CHOICE
-	if [ $CHOICE=="Yes" ]
+	if [ $CHOICE == "Yes" ]
 	then
 		read -p "Enter desired value for AWS Region:" region
 		if [ -z "$region" ] 
 		then
 			sed -i "s/\$region/$REGION/g" variables.tf
+			sed -i "s/\$ami_id/$AMI_ID/g" variables.tf
 		else
 			sed -i "s/\$region/$region/g" variables.tf
 			REGION=$region
 			__aws_cli
 			if __verify "aws"
 			then
-				ami_id=$(aws ec2 describe-images --region $region --owners amazon --filters 'Name=name,Values=al2023-ami-2023.1.*-kernel-6.1-x86_64*' --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+				ami_id=$(aws ec2 describe-images --region $region --owners amazon --filters 'Name=name,Values=amzn2-ami-kernel-5.10-hvm-2.0.20230119.1-x86_64-gp2' --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
 				sed -i "s/\$ami_id/$ami_id/g" variables.tf
 			fi
 		fi
 	else
 		sed -i "s/\$region/$REGION/g" variables.tf
+		sed -i "s/\$ami_id/$AMI_ID/g" variables.tf
 	fi
 
 	read -p "Enter desired value for VPC_CIDR:" vpc_cidr
@@ -192,12 +210,27 @@ function terraform_variable_overload() {
 	fi
         sed -i "s/\$docker_server/$docker_server/g" variables.tf
 
-	read -p "Enter desired value for Website name:" front_server
-	if [ -z "$front_server" ]; then
+	read -p "Enter desired value for Website name:" website_name
+	if [ -z "$website_name" ]; then
                 echo "Error: Value for Website Name cannot be empty"
 		exit 1
 	fi
-        sed -i "s/\$front_server/$front_server/g" variables.tf
+        sed -i "s/\$website_name/$website_name/g" variables.tf
+
+	read -p "Enter AWS Access Key:" access
+	if [ -z "$access" ]; then
+		echo "Error: Value of Access Key cannot be empty"
+		exit 1
+	fi
+
+	sed -i "$/\$access/$access/g" terraform_secret.tf
+
+	read -p "Enter AWS Secret Key:" secret
+	if [ -z "$secret" ]; then
+		cho "Error: Value of Secret Key cannot be empty"
+		exit 1
+	fi
+	sed -i "$/\$secret/$secret/g" terraform_secret.tf
 
 	echo "Terraform variable update completed!"
 	ansible_variable_overload
@@ -237,6 +270,12 @@ function ansible_variable_overload() {
 	##Update Docker-server Name using $docker_server variable from terraform_variable_overload function
 	sed -i "s/\(es_host: \"\)[a-zA-Z.]*/\1$docker_server/g" frontend_vars.yml
 
+	read -p "Enter Magento Admin Password:" pswd
+	if [ -z "$pswd" ]; then
+		pswd="Password123"
+	fi
+	sed -i "s/\(admin_pass: \"\)[a-zA-Z0-9]*/\1$pswd/g" frontend_vars.yml
+
 	##Update Backend-server variables
 	read -p "Enter MySql Password:" rootpwd
 	if [ -z "$rootpwd" ]; then
@@ -253,5 +292,7 @@ function ansible_variable_overload() {
 
 CHOICE=''
 REGION='ap-south-1'
-AMI_ID=''	
+AMI_ID='ami-01a4f99c4ac11b03c'
+access=''
+secret=''
 __install

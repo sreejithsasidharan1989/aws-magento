@@ -30,20 +30,20 @@ variable "instance-type" {
   default     = "$instance_type"
   description = "Instance Type"
 }
-variable "private-domain" {
-  default     = "$public_zone"
-  description = "DB_HOST Value"
+variable "private-zone" {
+  default     = "$private"
+  description = "Private DNS Zone Name"
 }
-variable "public-domain" {
-  default     = "$private_zone"
-  description = "Magento application Hostname"
+variable "public-zone" {
+  default     = "$public"
+  description = "Public DNS Zone Name"
 }
 variable "backend" {
-  default     = "$db_server_hostname"
+  default     = "$db_server"
   description = "Database server hostname"
 }
 variable "docker" {
-  default     = "$docker_server_hostname"
+  default     = "$docker_server"
   description = "Docker server hostname"
 }
 variable "frontend" {
@@ -53,3 +53,4 @@ variable "frontend" {
 variable "alb_switch" {}
 variable "cert_arn" {}
 variable "cert_switch" {}
+variable "dns_switch" {}

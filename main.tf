@@ -157,7 +157,7 @@ resource "aws_instance" "frontend-server" {
   }
   depends_on = [aws_instance.backend, aws_instance.docker, aws_route53_record.docker-server, aws_route53_record.backend-server]
   provisioner "local-exec" {
-    command = "ansible-playbook frontend.yml"
+    command = "ansible-playbook --ask-vault-pass frontend.yml"
   }
 }
 resource "aws_instance" "backend" {
@@ -172,7 +172,7 @@ resource "aws_instance" "backend" {
     Environment = "${local.common_tags.environment}"
   }
   provisioner "local-exec" {
-    command = "ansible-playbook backend.yml"
+    command = "ansible-playbook --ask-vault-pass backend.yml"
   }
 }
 resource "aws_instance" "docker" {
@@ -188,7 +188,7 @@ resource "aws_instance" "docker" {
   }
   depends_on = [aws_instance.backend]
   provisioner "local-exec" {
-    command = "ansible-playbook docker.yml"
+    command = "ansible-playbook --ask-vault-pass docker.yml"
   }
 }
 resource "aws_lb_target_group_attachment" "frontend_tg" {
@@ -197,23 +197,42 @@ resource "aws_lb_target_group_attachment" "frontend_tg" {
   port             = 80
 }
 resource "aws_route53_zone" "private" {
-  name = "backtracker.local"
+  name = var.private-zone
   vpc {
     vpc_id = module.vpc.vpc_id
   }
 }
-
+resource "aws_route53_zone" "public" {
+  count = var.dns_switch ? 1 : 0
+  name  = var.public-zone
+}
 resource "aws_route53_record" "frontend-servers" {
-  count   = var.alb_switch ? 0 : 1
-  zone_id = data.aws_route53_zone.public.id
+  count   = var.alb_switch && var.dns_switch ? 0 : 1
+  zone_id = data.aws_route53_zone.public[0].id
   name    = var.frontend
   type    = "A"
   ttl     = "300"
   records = [aws_instance.frontend-server.public_ip]
 }
 resource "aws_route53_record" "alb-cname" {
-  count   = var.alb_switch ? 1 : 0
-  zone_id = data.aws_route53_zone.public.id
+  count   = var.alb_switch && var.dns_switch ? 1 : 0
+  zone_id = aws_route53_zone.public[0].id
+  name    = var.frontend
+  type    = "CNAME"
+  ttl     = "300"
+  records = [module.alb.dns_name]
+}
+resource "aws_route53_record" "alb-off" {
+  count   = var.dns_switch == 1 && var.alb_switch == 0 ? 1 : 0
+  zone_id = aws_route53_zone.public[0].id
+  name    = var.frontend
+  type    = "A"
+  ttl     = "300"
+  records = [aws_instance.frontend-server.public_ip]
+}
+resource "aws_route53_record" "alb-on" {
+  count   = var.dns_switch == 0 && var.alb_switch == 1 ? 1 : 0
+  zone_id = data.aws_route53_zone.public[0].id
   name    = var.frontend
   type    = "CNAME"
   ttl     = "300"
