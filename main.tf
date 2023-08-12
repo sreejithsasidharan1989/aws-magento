@@ -14,7 +14,41 @@ module "alb" {
   subnet_ids  = module.vpc.public_subnets
   vpc_id      = module.vpc.vpc_id
   cert_switch = var.cert_switch
-  cert_arn    = var.cert_arn
+  cert_arn    = length(var.cert_arn) == 1 ? aws_acm_certificate.ssl[0].arn : var.cert_arn
+}
+resource "aws_acm_certificate" "ssl" {
+  count                     = length(var.cert_arn) == 1 ? 1 : 0
+  domain_name               = var.public-zone
+  validation_method         = "DNS"
+  subject_alternative_names = ["*.${var.public-zone}"]
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project
+  }
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+resource "aws_route53_record" "ssl" {
+  for_each = length(var.cert_arn) > 1 ? {} : {
+    for dvo in aws_acm_certificate.ssl[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+  allow_overwrite = true
+  name            =  each.value.name
+  records         =  [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = tonumber(var.dns_switch) == 0 ? data.aws_route53_zone.public[0].id : aws_route53_zone.public[0].id
+}
+resource "aws_acm_certificate_validation" "ssl_validate" {
+  count                   = length(var.cert_arn) == 1 ? 1 : 0
+  certificate_arn         = aws_acm_certificate.ssl[0].arn
+  validation_record_fqdns = [for record in aws_route53_record.ssl : record.fqdn]
 }
 resource "tls_private_key" "key_file" {
   algorithm = "RSA"
@@ -207,7 +241,7 @@ resource "aws_route53_zone" "public" {
   name  = var.public-zone
 }
 resource "aws_route53_record" "frontend-servers" {
-  count   = var.alb_switch && var.dns_switch ? 0 : 1
+  count   = var.alb_switch == 0 && var.dns_switch == 0 ? 1 : 0
   zone_id = data.aws_route53_zone.public[0].id
   name    = var.frontend
   type    = "A"
