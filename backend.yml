@@ -3,17 +3,20 @@
  - name: "Deploy Database Server"
    hosts: localhost
    become: no
-   vars:
-           - region: "ap-south-1"
    vars_files:
            - aws_creds.yml
            - backend_vars.yml
+           - region.yml
 
    tasks:
            - name: "Fetch instance details"
              amazon.aws.ec2_instance_info:
                      aws_access_key: "{{ access_key }}"
                      aws_secret_key: "{{ secret_key }}"
+                     region: "{{ region }}"
+                     filters:
+                         "tag:Name": "Backend-Server"
+                         instance-state-name: [ "running" ]
              register: aws_instances
 
            - name: "Print instance details"

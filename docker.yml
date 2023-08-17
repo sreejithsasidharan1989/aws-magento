@@ -2,10 +2,9 @@
  - name: "Install Docker and setup Elasticsearch container"
    hosts: localhost
    become: no
-   vars:
-           - region: "ap-south-1"
    vars_files:
            - aws_creds.yml
+           - region.yml
    tasks:
            - name: "Fetch Docker instance details"
              amazon.aws.ec2_instance_info:
@@ -13,7 +12,7 @@
                      aws_secret_key: "{{ secret_key }}"
                      region: "{{ region }}"
                      filters:
-                             "tag:Name": "Docker-worker"
+                             "tag:Name": "Docker-Worker"
                              instance-state-name: [ "running" ]
              register: aws_instances
 

@@ -3,10 +3,9 @@
  - name: "Deploy Frontend server data"
    hosts: localhost
    become: no
-   vars:
-           - region: "ap-south-1"
    vars_files:
            - aws_creds.yml
+           - region.yml
   
    tasks:
            - name: "Fetch instance details"

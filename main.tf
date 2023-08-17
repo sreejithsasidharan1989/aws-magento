@@ -17,7 +17,7 @@ module "alb" {
   cert_arn    = length(var.cert_arn) == 1 ? aws_acm_certificate.ssl[0].arn : var.cert_arn
 }
 resource "aws_acm_certificate" "ssl" {
-  count                     = length(var.cert_arn) == 1 ? 1 : 0
+  count                     = length(var.cert_arn) == 1 && tonumber(var.alb_switch) == 1 ? 1 : 0
   domain_name               = var.public-zone
   validation_method         = "DNS"
   subject_alternative_names = ["*.${var.public-zone}"]
@@ -31,7 +31,7 @@ resource "aws_acm_certificate" "ssl" {
   }
 }
 resource "aws_route53_record" "ssl" {
-  for_each = length(var.cert_arn) > 1 ? {} : {
+  for_each = length(var.cert_arn) == 1 && tonumber(var.alb_switch) == 1 ? {} : {
     for dvo in aws_acm_certificate.ssl[0].domain_validation_options : dvo.domain_name => {
       name   = dvo.resource_record_name
       record = dvo.resource_record_value
@@ -46,7 +46,7 @@ resource "aws_route53_record" "ssl" {
   zone_id         = tonumber(var.dns_switch) == 0 ? data.aws_route53_zone.public[0].id : aws_route53_zone.public[0].id
 }
 resource "aws_acm_certificate_validation" "ssl_validate" {
-  count                   = length(var.cert_arn) == 1 ? 1 : 0
+  count                   = length(var.cert_arn) == 1 && tonumber(var.alb_switch) == 1 ? 1 : 0
   certificate_arn         = aws_acm_certificate.ssl[0].arn
   validation_record_fqdns = [for record in aws_route53_record.ssl : record.fqdn]
 }
@@ -201,7 +201,7 @@ resource "aws_instance" "backend" {
   vpc_security_group_ids = [aws_security_group.backend-sg.id]
   subnet_id              = module.vpc.public_subnets[1]
   tags = {
-    Name        = "Backend-server"
+    Name        = "Backend-Server"
     Project     = "${local.common_tags.project}"
     Environment = "${local.common_tags.environment}"
   }
@@ -216,7 +216,7 @@ resource "aws_instance" "docker" {
   vpc_security_group_ids = [aws_security_group.docker-sg.id]
   subnet_id              = module.vpc.public_subnets[1]
   tags = {
-    Name        = "Docker-worker"
+    Name        = "Docker-Worker"
     Project     = "${local.common_tags.project}"
     Environment = "${local.common_tags.environment}"
   }

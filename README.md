@@ -17,13 +17,18 @@ In this project, the infrastructure is built using Terraform, and the Ec2 instan
 4. MariaDB - 10.6
 5. Elasticsearch Container - 7.17
 
-After interpolating the configuration files like httpd.conf, virtualhost.conf, and www.conf using Jinja, they get copied from the local system to the target server by Ansible. An application load balancer has been positioned in front of the Apache Webserver to handle SSL requests. Ansible will make use of the ssh-key that Terraform generates on its own to connect to instances. variables.tf allow for the management of all variables including the AWS Region, Project & Environment Tags. Ansible will look for a file called "aws_creds.yml" for AWS credentials; however, for Terraform, the AWS credentials must be placed into a file with a '.tf' extension.
+The configuration management is done with the help of Ansible. Ansible connects to the instances deployed using Terraform by creating a **Dynamic Host** file. Configuration files such as httpd.conf, virtualhost.conf, www.conf, etc. are uploaded from the local system to the remote system after substituing the value of variable at run-time. Hence, any changes to these configuration files can be immedietly applied on the live infra. By default, Ansible attempt to connect to ap-south-1 region unless the region not updated by running the setup.sh script. All required packages are defined within respective var_files, any additional package name can be added to the var_file when there is a need of a different package.
 
 ##### Features
-- setup.sh file will automatically install tools like Ansible, Terraform, and AWS-CLI ( if needed ) based on the Unix-like Operating System that you're in ( Only Support, RHEL/Debian ).
-- The script also allows changing the Region and takes care of the AMI_ID based on the chosen region ( Currently this project only works on Amazon Linux 2 ).
-- Values for a number of variables are assigned using this script, see "How to run this Project" section for more details.
-- This project gives the option to deploy an application load balancer with or without SSL support.
+- The script setup.sh will automatically install required tools like **Ansible, Terraform, and AWS-CLI** ( if needed ) based on the Unix-like Operating System ( Currently Support, RHEL & Debian ).
+- The script automatically change the AMI_ID upon choosing a different **Region** other than ap-south-1.
+- A number of variable mapping is performed upon executing the script ( See "How to run this Project" section for more details ).
+- This project gives the option to deploy an **Application Load Balancer** with or without SSL support.
+- Based on the value of the terrform variable cert_arn, the project will automatically setup an **Amazon Issued** SSL certificate.
+- During the development of the project, an existing DNS zone was used, hence the project allow using an existing DNS zone, or it will create one on it's own when the corresponding switch is toggled ( See "How to run this Project" section for more details ).
+- Make sure to provide the existing public DNS zone name when prompted for **Public Hosted Zone** value while running the script if opting out creating new DNS zone option.
+- If enabled, the project automatically assign the Load Balancer's Public DNS Hostname as **CNAME** of the Website Name
+- Credentials for Ansible playbooks are stored in aws_credentials.yml file, this file will be encrypted using ansible-vault by the setup.sh file.
 
 ##### How to run this project
 ###### Prerequisites
@@ -59,7 +64,8 @@ In order to successfully complete the deployment, the following details are need
    - Magento Admin Firstname ( First name of Magento Admin )
    - Magento Admin Lastname ( Last name of Magento Admin )
    - Magento Admin Email ( Email address of admin user )
-   - Magento Admin Username ( Username for admin user )
+   - Magento Admin Username ( Username to login to Magento admin panel )
+   - Magento Admin Password ( Password to login to Magento admin panel )
    - MySql Root Password ( Root password for MySql )
 5. Run 'terraform validate' followed by 'terraform plan' to validate the code and perform a test run.
    
@@ -71,17 +77,21 @@ In order to successfully complete the deployment, the following details are need
      
    - var.cert_arn
      Enter a value:
-     An SSL Certificate ARN is necessary only when the value of var.alb_switch is set to 1.
+     An SSL Certificate ARN is necessary only when the value of var.alb_switch is set to 1. 
      
    - var.cert_switch
      Enter a value:
      Valid inputs are 1 & 0 based on which SSL support will be added to the Load balancer. Only important when var.alb_switch is set to 1.
 
+   - var.dns_switch
+     Enter a value:
+     This switch determines whether or not to create a new DNS zone or use an existing one. 
+
    - var.nat_switch
      Enter a value:
      The infra does not support the use of Nat-Gateway at this point, so it is recommended to set it to 0.
      
-7. Expect the infrastructure to be fully operational within 15 to 25 minutes.
+7. It could take 20 - 25 minutes to complete the process.
 
 ##### Future Updates
 1. Add support for Auto-scaling

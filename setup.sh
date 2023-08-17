@@ -91,6 +91,7 @@ function deb_install {
                 echo "========= Installing Ansible ========="
                 sudo apt update
                 sudo apt -qq install ansible -y
+		pip -qq install boto3 botocore
 		__ansible_vault
                 if __verify "ansible"
                 then
@@ -115,7 +116,8 @@ function rhel_install {
         if __verify "ansible"
         then
 		sudo yum install python3 python3-pip -y -q && echo "======= Python and PIP installation Completed! ========"
-                pip install ansible --quiet --log /tmp/pip.log
+                pip -qq install ansible /tmp/pip.log
+		pip -qq install boto3 botocore
 		__ansible_vault
                 if __verify "ansible"
                 then
@@ -154,6 +156,7 @@ function terraform_variable_overload() {
 			sed -i "s/\$ami_id/$AMI_ID/g" variables.tf
 		else
 			sed -i "s/\$region/$region/g" variables.tf
+			unset REGION
 			REGION=$region
 			__aws_cli
 			if __verify "aws"
@@ -285,6 +288,9 @@ function ansible_variable_overload() {
 	
 	##Update Database-server Name using value of $db_server from terraform_variable_overload function
 	sed -i "s/\(mysql_host: \"\)[a-zA-Z.]*/\1$db_server/g" backend_vars.yml
+
+	##Update value of $region in region.yml
+	sed -i "s/\$region/$REGION/g" region.yml
 
 	echo "========= Ansible Variable Update completed! ========"
 	return 1
